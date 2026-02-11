@@ -4,6 +4,6 @@ A machine learning web application that automatically classifies CVs/resumes int
 
 Check requirements.txt for the modules required
 
-Run the application
+Run the application using
 streamlit run app.py
 
