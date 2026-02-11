@@ -16,19 +16,17 @@ pipeline = model_data['pipeline']
 
 # To extract text from files
 def extract_text_from_file(uploaded_file):
-    "Extract text from .txt, .docx, .doc, .pdf files"
+    "Extract text from .docx, .doc, .pdf files"
     text = ""
     
     # Get file extension
     file_extension = uploaded_file.name.split('.')[-1].lower()
     
     try:
-        if file_extension == 'txt':
-            text = uploaded_file.read().decode('utf-8')
         
-        elif file_extension == 'docx':
+        if file_extension == 'docx':
             from docx import Document
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp:
+            with tempfile.NamedTemporaryFile(delete = False, suffix = '.docx') as tmp:
                 tmp.write(uploaded_file.getbuffer())
                 tmp_path = tmp.name
             
@@ -37,17 +35,34 @@ def extract_text_from_file(uploaded_file):
             os.unlink(tmp_path)
         
         elif file_extension == 'doc':
-            from docx import Document
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.doc') as tmp:
-                tmp.write(uploaded_file.getbuffer())
-                tmp_path = tmp.name
+            # .doc files - TRY basic extraction, fallback to error
+            try:
+                # Read as binary text (works for some .doc files)
+                content = uploaded_file.getvalue()
             
-            doc = Document(tmp_path)
-            text = '\n'.join([para.text for para in doc.paragraphs])
-            os.unlink(tmp_path)
+                # UTF-8/Latin-1 decoding
+                for encoding in ['utf-8', 'latin-1', 'cp1252']:
+                    try:
+                        text = content.decode(encoding, errors = 'ignore')
+                        # Clean up - remove binary garbage
+                        import re
+                        text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\xFF]', ' ', text)
+                        text = ' '.join(text.split())  # Normalize whitespace
+                    
+                        if len(text) > 100:  # If we got reasonable text
+                            return text[:10000]  # Limit length
+                    except:
+                        continue
+            
+                # If decoding failed, return empty with instructions
+                return ""  # Will trigger the error message below
+            
+            except Exception:
+                return ""  # Empty triggers conversion message
+
         
         elif file_extension == 'pdf':
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+            with tempfile.NamedTemporaryFile(delete = False, suffix = '.pdf') as tmp:
                 tmp.write(uploaded_file.getbuffer())
                 tmp_path = tmp.name
             
@@ -60,7 +75,7 @@ def extract_text_from_file(uploaded_file):
             text = f"Unsupported file format: .{file_extension}"
             
     except Exception as e:
-        text = f"Error reading file: {str(e)}"
+        text = f"Error reading file: {str(e)}, Paste the CV in the box provided"
     
     return text
 
@@ -72,8 +87,8 @@ st.markdown("Upload a CV file or paste text to classify job category")
 st.subheader("Upload CV ")
 uploaded_file = st.file_uploader(
     "Choose a file", 
-    type=['txt', 'docx', 'doc', 'pdf'],
-    help="Upload .txt, .docx, .doc or .pdf files"
+    type = ['docx', 'doc', 'pdf'],
+    help = "Upload .docx, .doc or .pdf files"
 )
 
 cv_text = ""
@@ -95,7 +110,7 @@ if uploaded_file:
             st.metric("Text Length", f"{len(cv_text):,} chars")
         
         # Show extracted text
-        with st.expander("📋 View extracted text"):
+        with st.expander("View extracted text"):
             st.text(cv_text[:1000] + "..." if len(cv_text) > 1000 else cv_text)
     else:
         st.error(cv_text)
